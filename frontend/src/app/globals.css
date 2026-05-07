@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --arc-primary: #5461f5;
+  --arc-secondary: #7589ff;
+  --arc-gold: #fbbf24;
+  --arc-bg: #0d0d1a;
+  --arc-surface: #13132a;
+  --arc-border: rgba(84, 97, 245, 0.25);
+  --arc-text-muted: rgba(255, 255, 255, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--arc-bg); }
+::-webkit-scrollbar-thumb { background: var(--arc-primary); border-radius: 3px; }
+
+/* Selection */
+::selection { background: rgba(84, 97, 245, 0.35); color: white; }
+
+/* ── Custom utilities ─────────────────────────────────────────── */
+@layer utilities {
+  .arc-surface {
+    background: var(--arc-surface);
+    border: 1px solid var(--arc-border);
+    border-radius: 16px;
+  }
+
+  .arc-glow {
+    box-shadow: 0 0 30px rgba(84, 97, 245, 0.2),
+                0 0 60px rgba(84, 97, 245, 0.08);
+  }
+
+  .text-muted {
+    color: var(--arc-text-muted);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #7589ff 0%, #5461f5 50%, #fbbf24 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .mesh-bg {
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(84, 97, 245, 0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 80% 80%, rgba(251, 191, 36, 0.06) 0%, transparent 60%),
+      var(--arc-bg);
+  }
+}
+
+/* ── Flow animation (step arrows) ────────────────────────────── */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+.flow-arrow {
+  animation: dash-flow 1.2s linear infinite;
+  stroke-dasharray: 6 4;
+}
+
+/* ── Shimmer skeleton ─────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* ── Pulse ring ───────────────────────────────────────────────── */
+@keyframes ping-ring {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+.ping-ring {
+  animation: ping-ring 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
