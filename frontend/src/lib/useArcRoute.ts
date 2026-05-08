@@ -43,21 +43,29 @@ export function useArcRoute() {
     const netAmount = tx.estimatedOutput;
 
     try {
-      // ── 2. Load Circle App Kit + adapter ──────────────────────────────────
-      const { AppKit }                  = await import('@circle-fin/app-kit');
+      // ── 2. Load Circle App Kit + viem adapter ─────────────────────────────
+      const { AppKit }                    = await import('@circle-fin/app-kit');
       const { createAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2');
 
-      // Extract EIP-1193 provider from wagmi connector (works with MetaMask etc.)
-      const provider = (connectorClient as any)?.transport?.value?.provider;
-      if (!provider) throw new Error('Could not get wallet provider');
+      // Extract EIP-1193 provider from wagmi connector
+      const provider = (connectorClient as any)?.transport?.value?.provider
+                    ?? (connectorClient as any)?.provider
+                    ?? (window as any)?.ethereum;
 
-      // Create adapter from the browser wallet provider
-      const adapter = await createAdapterFromProvider({ provider });
+      if (!provider) throw new Error('Could not get wallet provider from connector');
 
-      // AppKit takes no constructor args — kit key is set via env or adapter
+      // Create source chain adapter
+      const sourceAdapter = await createAdapterFromProvider({ provider });
+
+      // Create Arc Testnet adapter (same wallet, different chain context)
+      const arcAdapter = await createAdapterFromProvider({ provider });
+
+      // Initialize AppKit — no constructor args needed
       const kit = new AppKit();
 
-      console.log('[AppKit] ✅ Loaded with createAdapterFromProvider');
+      const kitKey = process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY ?? '';
+
+      console.log('[AppKit] ✅ Initialized');
 
       // ── 3. SWAP (skip if already USDC) ────────────────────────────────────
       if (token !== 'USDC') {
@@ -66,15 +74,19 @@ export function useArcRoute() {
 
         try {
           const result = await kit.swap({
-            from:     { adapter, chain: appKitChain },
+            from:     { adapter: sourceAdapter, chain: appKitChain },
             tokenIn:  appKitToken,
             tokenOut: 'USDC',
-            amount:   netAmount,
+            amountIn: netAmount,
+            config: {
+              kitKey,
+              slippageBps: 300,
+            },
           });
           await api.updateStep(id, {
             step:   'swap',
             status: 'done',
-            txHash: result?.txHash ?? result?.transactionHash ?? result?.hash,
+            txHash: result?.hash ?? result?.txHash ?? result?.transactionHash,
           });
           console.log('[AppKit] ✅ Swap done', result);
         } catch (err: any) {
@@ -92,15 +104,15 @@ export function useArcRoute() {
 
         try {
           const result = await kit.bridge({
-            from:   { adapter, chain: appKitChain },
-            to:     { adapter, chain: 'Arc_Testnet' },
-            token:  'USDC',
+            from:   sourceAdapter,
+            to:     { adapter: arcAdapter, chain: 'Arc_Testnet' },
             amount: netAmount,
+            token:  'USDC',
           });
           await api.updateStep(id, {
             step:   'bridge',
             status: 'done',
-            txHash: result?.txHash ?? result?.transactionHash ?? result?.hash,
+            txHash: result?.hash ?? result?.txHash ?? result?.transactionHash,
           });
           console.log('[AppKit] ✅ Bridge done', result);
         } catch (err: any) {
@@ -117,15 +129,15 @@ export function useArcRoute() {
 
       try {
         const result = await kit.send({
-          from:   { adapter, chain: 'Arc_Testnet' },
+          from:   { adapter: arcAdapter, chain: 'Arc_Testnet' },
           to:     destination,
-          token:  'USDC',
           amount: netAmount,
+          token:  'USDC',
         });
         await api.updateStep(id, {
           step:   'send',
           status: 'done',
-          txHash: result?.txHash ?? result?.transactionHash ?? result?.hash,
+          txHash: result?.hash ?? result?.txHash ?? result?.transactionHash,
         });
         console.log('[AppKit] ✅ Send done', result);
       } catch (err: any) {
