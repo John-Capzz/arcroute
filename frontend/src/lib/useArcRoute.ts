@@ -11,7 +11,16 @@ export interface RouteParams {
   destination: string;
 }
 
-const APP_KIT_CHAIN: Record<string, string> = {
+// Chain names for SWAP (short names)
+const SWAP_CHAIN: Record<string, string> = {
+  Ethereum_Sepolia: 'Ethereum',
+  BNB_Testnet:      'BNB',
+  Base_Sepolia:     'Base',
+  Arc_Testnet:      'Arc_Testnet',
+};
+
+// Chain names for BRIDGE and SEND (full names)
+const BRIDGE_CHAIN: Record<string, string> = {
   Ethereum_Sepolia: 'Ethereum_Sepolia',
   BNB_Testnet:      'BNB_Testnet',
   Base_Sepolia:     'Base_Sepolia',
@@ -32,10 +41,11 @@ export function useArcRoute() {
     if (!connectorClient) throw new Error('Wallet not connected');
 
     const { chain, token, amount, destination } = params;
-    const appKitChain = APP_KIT_CHAIN[chain];
-    const appKitToken = APP_KIT_TOKEN[token] ?? token;
+    const appKitSwapChain   = SWAP_CHAIN[chain];
+    const appKitBridgeChain = BRIDGE_CHAIN[chain];
+    const appKitToken       = APP_KIT_TOKEN[token] ?? token;
 
-    if (!appKitChain) throw new Error(`Unsupported chain: ${chain}`);
+    if (!appKitSwapChain) throw new Error(`Unsupported chain: ${chain}`);
 
     // ── 1. Create backend tracking record ─────────────────────────────────────
     const tx        = await api.createTransaction({ chain, token, amount, destination });
@@ -74,7 +84,7 @@ export function useArcRoute() {
 
         try {
           const result = await kit.swap({
-            from:     { adapter: sourceAdapter, chain: appKitChain },
+            from:     { adapter: sourceAdapter, chain: appKitSwapChain },
             tokenIn:  appKitToken,
             tokenOut: 'USDC',
             amountIn: netAmount,
