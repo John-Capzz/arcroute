@@ -1,6 +1,6 @@
 'use client';
 
-import { useWalletClient, usePublicClient } from 'wagmi';
+import { useConnectorClient } from 'wagmi';
 import { useCallback } from 'react';
 import { api } from './api';
 
@@ -11,7 +11,6 @@ export interface RouteParams {
   destination: string;
 }
 
-// ── App Kit chain name mapping ─────────────────────────────────────────────────
 const APP_KIT_CHAIN: Record<string, string> = {
   Ethereum_Sepolia: 'Ethereum_Sepolia',
   BNB_Testnet:      'BNB_Testnet',
@@ -19,7 +18,6 @@ const APP_KIT_CHAIN: Record<string, string> = {
   Arc_Testnet:      'Arc_Testnet',
 };
 
-// ── Token mapping ──────────────────────────────────────────────────────────────
 const APP_KIT_TOKEN: Record<string, string> = {
   ETH:  'NATIVE',
   BNB:  'NATIVE',
@@ -28,11 +26,10 @@ const APP_KIT_TOKEN: Record<string, string> = {
 };
 
 export function useArcRoute() {
-  const { data: walletClient } = useWalletClient();
-  const publicClient           = usePublicClient();
+  const { data: connectorClient } = useConnectorClient();
 
   const route = useCallback(async (params: RouteParams): Promise<string> => {
-    if (!walletClient) throw new Error('Wallet not connected');
+    if (!connectorClient) throw new Error('Wallet not connected');
 
     const { chain, token, amount, destination } = params;
     const appKitChain = APP_KIT_CHAIN[chain];
@@ -46,23 +43,24 @@ export function useArcRoute() {
     const netAmount = tx.estimatedOutput;
 
     try {
-      // ── 2. Load Circle App Kit + correct viem adapter ─────────────────────
-      const { AppKit }      = await import('@circle-fin/app-kit');
-      const { ViemAdapter } = await import('@circle-fin/adapter-viem-v2');
+      // ── 2. Load Circle App Kit + adapter ──────────────────────────────────
+      const { AppKit }                  = await import('@circle-fin/app-kit');
+      const { createAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2');
 
-      // Build adapter from connected wagmi wallet
-      const adapter = new ViemAdapter({
-        walletClient,
-        publicClient,
-      });
+      // Extract EIP-1193 provider from wagmi connector (works with MetaMask etc.)
+      const provider = (connectorClient as any)?.transport?.value?.provider;
+      if (!provider) throw new Error('Could not get wallet provider');
+
+      // Create adapter from the browser wallet provider
+      const adapter = await createAdapterFromProvider({ provider });
 
       const kit = new AppKit({
         kitKey: process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY,
       });
 
-      console.log('[AppKit] ✅ Loaded with ViemAdapter');
+      console.log('[AppKit] ✅ Loaded with createAdapterFromProvider');
 
-      // ── 3. SWAP (skip if already USDC) ───────────────────────────────────
+      // ── 3. SWAP (skip if already USDC) ────────────────────────────────────
       if (token !== 'USDC') {
         await api.updateStep(id, { step: 'overall', status: 'swapping' });
         await api.updateStep(id, { step: 'swap',    status: 'pending'  });
@@ -88,7 +86,7 @@ export function useArcRoute() {
         await api.updateStep(id, { step: 'swap', status: 'skipped' });
       }
 
-      // ── 4. BRIDGE (skip if already on Arc) ─────────────────────────────────
+      // ── 4. BRIDGE (skip if already on Arc) ───────────────────────────────
       if (chain !== 'Arc_Testnet') {
         await api.updateStep(id, { step: 'overall', status: 'bridging' });
         await api.updateStep(id, { step: 'bridge',  status: 'pending'  });
@@ -114,7 +112,7 @@ export function useArcRoute() {
         await api.updateStep(id, { step: 'bridge', status: 'skipped' });
       }
 
-      // ── 5. SEND ────────────────────────────────────────────────────────────
+      // ── 5. SEND ───────────────────────────────────────────────────────────
       await api.updateStep(id, { step: 'overall', status: 'sending' });
       await api.updateStep(id, { step: 'send',    status: 'pending'  });
 
@@ -149,7 +147,7 @@ export function useArcRoute() {
     }
 
     return id;
-  }, [walletClient, publicClient]);
+  }, [connectorClient]);
 
   return { route };
 }
