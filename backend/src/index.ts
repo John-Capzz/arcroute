@@ -9,13 +9,11 @@ const PORT = parseInt(process.env.PORT ?? '3002', 10);
 const FEE  = parseFloat(process.env.FEE_PERCENT ?? '0.3');
 
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) cb(null, true);
-    else cb(new Error('Not allowed by CORS'));
-  },
+  origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type'],
 }));
+app.options('*', cors());
 app.use(express.json());
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
