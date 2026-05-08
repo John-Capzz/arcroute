@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3002';
+const API_URL = 'https://shimmering-cat-production-6fa9.up.railway.app';
 
 export interface CreateTxRequest {
   chain: string;
