@@ -54,9 +54,13 @@ export function useArcRoute() {
       // Create adapter from the browser wallet provider
       const adapter = await createAdapterFromProvider({ provider });
 
-      const kit = new AppKit({
-        kitKey: process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY,
-      });
+      // Initialize AppKit — kitKey may be read from env automatically
+      // Using 'as any' to bypass strict typing since SDK is newly released
+      const kit = new (AppKit as any)(
+        process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY
+          ? { kitKey: process.env.NEXT_PUBLIC_CIRCLE_KIT_KEY }
+          : {}
+      );
 
       console.log('[AppKit] ✅ Loaded with createAdapterFromProvider');
 
