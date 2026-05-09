@@ -1,4 +1,4 @@
-const API_URL = 'https://shimmering-cat-production-6fa9.up.railway.app';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://shimmering-cat-production-6fa9.up.railway.app';
 
 export interface CreateTxRequest {
   chain: string;
@@ -74,6 +74,18 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   // Create a tracking record — returns ID immediately
+  performSwap: (body: {
+    transactionId: string;
+    chain: string;
+    tokenIn: string;
+    amount: string;
+    kitKey: string;
+  }) =>
+    apiFetch<{ txHash: string; outputAmount: string }>('/swap', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   createTransaction: (body: CreateTxRequest) =>
     apiFetch<CreateTxResponse>('/transaction', { method: 'POST', body: JSON.stringify(body) }),
 

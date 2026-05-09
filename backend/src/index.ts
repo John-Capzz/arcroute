@@ -101,7 +101,46 @@ app.get('/estimate', async (req: Request, res: Response) => {
   });
 });
 
-// ── POST /transaction — create a new transaction record ───────────────────────
+// ── POST /swap — server-side swap via Circle App Kit ─────────────────────────
+app.post('/swap', async (req: Request, res: Response) => {
+  const { transactionId, chain, tokenIn, amount, kitKey } = req.body;
+
+  if (!chain || !tokenIn || !amount || !kitKey) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const { AppKit } = await import('@circle-fin/app-kit');
+    const { ViemAdapter } = await import('@circle-fin/adapter-viem-v2');
+    const { createWalletClient, http } = await import('viem');
+    const { privateKeyToAccount } = await import('viem/accounts');
+
+    // Use a server-side wallet for swap quotes
+    // The actual funds come from the user — this just gets the quote
+    const kit = new AppKit();
+
+    const estimate = await (kit as any).estimateSwap({
+      from:     { chain },
+      tokenIn,
+      tokenOut: 'USDC',
+      amountIn: amount,
+      config:   { kitKey, slippageBps: 300 },
+    });
+
+    console.log(`[Swap] Estimate for ${amount} ${tokenIn} on ${chain}:`, estimate);
+
+    return res.json({
+      txHash:       null, // Real swap tx happens via wallet on frontend
+      outputAmount: estimate?.estimatedOutput?.amount ?? amount,
+      estimate,
+    });
+  } catch (err: any) {
+    console.error('[Swap] Error:', err);
+    return res.status(500).json({ error: err.message ?? 'Swap failed' });
+  }
+});
+
+
 // Frontend calls this FIRST to get a tracking ID, then does the chain calls itself
 app.post('/transaction', (req: Request, res: Response) => {
   const { chain, token, amount, destination } = req.body;

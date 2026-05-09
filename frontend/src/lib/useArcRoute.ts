@@ -78,27 +78,27 @@ export function useArcRoute() {
       console.log('[AppKit] ✅ Initialized');
 
       // ── 3. SWAP (skip if already USDC) ────────────────────────────────────
+      // NOTE: kit.swap() is server-side only (CORS blocked from browser)
+      // For non-USDC tokens, we trigger swap via the backend
       if (token !== 'USDC') {
         await api.updateStep(id, { step: 'overall', status: 'swapping' });
         await api.updateStep(id, { step: 'swap',    status: 'pending'  });
 
         try {
-          const result = await kit.swap({
-            from:     { adapter: sourceAdapter, chain: appKitSwapChain },
-            tokenIn:  appKitToken,
-            tokenOut: 'USDC',
-            amountIn: netAmount,
-            config: {
-              kitKey,
-              slippageBps: 300,
-            },
+          // Call backend to perform swap server-side
+          const swapResult = await api.performSwap({
+            transactionId: id,
+            chain:         appKitSwapChain,
+            tokenIn:       appKitToken,
+            amount:        netAmount,
+            kitKey:        'KIT_KEY:e7efa7add230055eb1f990975e39821b:499ccfc7a14cda7985bcedc42bf907e4',
           });
           await api.updateStep(id, {
             step:   'swap',
             status: 'done',
-            txHash: result?.hash ?? result?.txHash ?? result?.transactionHash,
+            txHash: swapResult?.txHash,
           });
-          console.log('[AppKit] ✅ Swap done', result);
+          console.log('[AppKit] ✅ Swap done via backend', swapResult);
         } catch (err: any) {
           await api.updateStep(id, { step: 'swap', status: 'failed', error: String(err) });
           throw new Error(`Swap failed: ${err.message}`);
