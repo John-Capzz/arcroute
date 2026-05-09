@@ -26,11 +26,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', version: '1.0.0', service: 'ArcRoute API', port: PORT });
 });
 
-// ── Price cache (avoid hammering CoinGecko) ───────────────────────────────────
+// ── Price cache ───────────────────────────────────────────────────────────────
 const priceCache: Record<string, { price: number; fetchedAt: number }> = {};
-const CACHE_TTL_MS = 30_000; // 30 seconds
+const CACHE_TTL_MS = 30_000;
 
-// CoinGecko IDs for each token
 const COINGECKO_IDS: Record<string, string> = {
   ETH:  'ethereum',
   BNB:  'binancecoin',
@@ -38,33 +37,88 @@ const COINGECKO_IDS: Record<string, string> = {
   USDT: 'tether',
 };
 
+// Try multiple price APIs with fallback
 async function getUSDPrice(token: string): Promise<number> {
-  // Stablecoins are always $1
   if (token === 'USDC' || token === 'USDT') return 1;
 
   const cached = priceCache[token];
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    console.log(`[Price] ${token} = $${cached.price} (cached)`);
     return cached.price;
   }
 
-  const geckoId = COINGECKO_IDS[token];
-  if (!geckoId) return 1;
+  // Try Binance first (no API key, no rate limits)
+  const binanceSymbols: Record<string, string> = {
+    ETH: 'ETHUSDT',
+    BNB: 'BNBUSDT',
+  };
 
-  try {
-    const res  = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd`,
-      { headers: { 'Accept': 'application/json' } }
-    );
-    const data = await res.json() as Record<string, { usd: number }>;
-    const price = data[geckoId]?.usd ?? 1;
-    priceCache[token] = { price, fetchedAt: Date.now() };
-    console.log(`[Price] ${token} = $${price}`);
-    return price;
-  } catch (err) {
-    console.error(`[Price] Failed to fetch ${token} price:`, err);
-    // Fall back to cached price if available, else return 1
-    return priceCache[token]?.price ?? 1;
+  const binanceSymbol = binanceSymbols[token];
+  if (binanceSymbol) {
+    try {
+      const res  = await fetch(
+        `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      const data = await res.json() as { price: string };
+      if (data?.price) {
+        const price = parseFloat(data.price);
+        priceCache[token] = { price, fetchedAt: Date.now() };
+        console.log(`[Price] ${token} = $${price} (Binance)`);
+        return price;
+      }
+    } catch (err) {
+      console.warn(`[Price] Binance failed for ${token}:`, err);
+    }
   }
+
+  // Fallback to CoinGecko
+  const geckoId = COINGECKO_IDS[token];
+  if (geckoId) {
+    try {
+      const res  = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      const data = await res.json() as Record<string, { usd: number }>;
+      const price = data[geckoId]?.usd;
+      if (price && price > 1) {
+        priceCache[token] = { price, fetchedAt: Date.now() };
+        console.log(`[Price] ${token} = $${price} (CoinGecko)`);
+        return price;
+      }
+    } catch (err) {
+      console.warn(`[Price] CoinGecko failed for ${token}:`, err);
+    }
+  }
+
+  // Last resort — Kraken
+  const krakenPairs: Record<string, string> = {
+    ETH: 'ETHUSD',
+    BNB: 'BNBUSD',
+  };
+  const krakenPair = krakenPairs[token];
+  if (krakenPair) {
+    try {
+      const res  = await fetch(
+        `https://api.kraken.com/0/public/Ticker?pair=${krakenPair}`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      const data = await res.json() as any;
+      const result = data?.result?.[Object.keys(data?.result ?? {})[0]];
+      const price  = parseFloat(result?.c?.[0]);
+      if (price && price > 1) {
+        priceCache[token] = { price, fetchedAt: Date.now() };
+        console.log(`[Price] ${token} = $${price} (Kraken)`);
+        return price;
+      }
+    } catch (err) {
+      console.warn(`[Price] Kraken failed for ${token}:`, err);
+    }
+  }
+
+  console.error(`[Price] All price APIs failed for ${token}, returning 1`);
+  return priceCache[token]?.price ?? 1;
 }
 
 // ── Estimate ──────────────────────────────────────────────────────────────────
