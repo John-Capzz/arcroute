@@ -58,14 +58,20 @@ export function useArcRoute() {
       const { createAdapterFromProvider } = await import('@circle-fin/adapter-viem-v2');
 
       // Extract EIP-1193 provider from wagmi connector
+      // Try multiple ways to get the provider
       const provider = (connectorClient as any)?.transport?.value?.provider
+                    ?? (connectorClient as any)?.transport?.provider
                     ?? (connectorClient as any)?.provider
                     ?? (window as any)?.ethereum;
 
-      if (!provider) throw new Error('Could not get wallet provider from connector');
+      console.log('[AppKit] Provider found:', !!provider, typeof provider);
+
+      if (!provider) throw new Error('Could not get wallet provider. Make sure MetaMask is connected.');
 
       // Create source chain adapter
+      console.log('[AppKit] Creating adapter from provider...');
       const sourceAdapter = await createAdapterFromProvider({ provider });
+      console.log('[AppKit] ✅ Adapter created:', !!sourceAdapter);
 
       // Create Arc Testnet adapter (same wallet, different chain context)
       const arcAdapter = await createAdapterFromProvider({ provider });

@@ -155,9 +155,9 @@ app.get('/estimate', async (req: Request, res: Response) => {
   });
 });
 
-// ── POST /swap — server-side swap via Circle App Kit ─────────────────────────
+// ── POST /swap — server-side swap estimate via Circle App Kit ─────────────────
 app.post('/swap', async (req: Request, res: Response) => {
-  const { transactionId, chain, tokenIn, amount, kitKey } = req.body;
+  const { chain, tokenIn, amount, kitKey } = req.body;
 
   if (!chain || !tokenIn || !amount || !kitKey) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -165,12 +165,6 @@ app.post('/swap', async (req: Request, res: Response) => {
 
   try {
     const { AppKit } = await import('@circle-fin/app-kit');
-    const { ViemAdapter } = await import('@circle-fin/adapter-viem-v2');
-    const { createWalletClient, http } = await import('viem');
-    const { privateKeyToAccount } = await import('viem/accounts');
-
-    // Use a server-side wallet for swap quotes
-    // The actual funds come from the user — this just gets the quote
     const kit = new AppKit();
 
     const estimate = await (kit as any).estimateSwap({
@@ -184,7 +178,7 @@ app.post('/swap', async (req: Request, res: Response) => {
     console.log(`[Swap] Estimate for ${amount} ${tokenIn} on ${chain}:`, estimate);
 
     return res.json({
-      txHash:       null, // Real swap tx happens via wallet on frontend
+      txHash:       null,
       outputAmount: estimate?.estimatedOutput?.amount ?? amount,
       estimate,
     });
